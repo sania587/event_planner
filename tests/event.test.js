@@ -1,5 +1,5 @@
 const request = require('supertest');
-const app = require('../server'); 
+const {app,server} = require('../server'); 
 jest.useFakeTimers(); 
 
 let token; 
@@ -130,4 +130,9 @@ describe('Event & Reminder Functionality', () => {
         expect(response.statusCode).toBe(401);
         expect(response.body.message).toBe('Access Denied');
     });
+});
+
+
+afterAll(() => {
+    server.close(); 
 });
