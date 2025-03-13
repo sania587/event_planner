@@ -30,6 +30,7 @@ exports.createEvent = (req, res) => {
         category,
         reminderMinutes,
         reminderTime,
+        username
     };
 
     events.push(event);

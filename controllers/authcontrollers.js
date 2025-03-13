@@ -22,7 +22,7 @@ exports.loginUser = (req, res) => {
         return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign({ username }, "shhhh", { expiresIn: "1h" });
 
     res.json({ token });
 };

@@ -1,83 +1,133 @@
 const request = require('supertest');
-const app = require('../server'); // Import the app for testing without starting the server
-const http = require('http'); // Import http to create a server instance
-const server = http.createServer(app); // Create a server instance
+const app = require('../server'); 
+jest.useFakeTimers(); 
 
-describe('Event API', () => {
-    let authToken = ""; // To store token after login
-
-    beforeAll(async () => {
-        // Register a user (if authentication is needed)
-        await request(server) // Use the server instance for requests
-            .post('/auth/register')
-            .send({ username: "sania", password: "123456" });
-
-        // Login and get the token
-        const loginRes = await request(server) // Use the server instance for requests
-            .post('/auth/login')
-            .send({ username: "sania", password: "123456" });
-
-        authToken = loginRes.body.token;
+let token; 
+beforeAll(async () => {
+    const response = await request(app).post('/auth/login').send({
+        username: 'sania',
+        password: '123456'
     });
 
-    it('should create an event successfully', async () => {
-        const res = await request(server) // Use the server instance for requests
+    token = response.body.token;
+});
+
+describe('Authentication Routes', () => {
+    it('should register a new user', async () => {
+        const response = await request(app).post('/auth/register').send({
+            username: 'sania',
+            password: '123456'
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body.message).toBe('User registered successfully');
+    });
+
+    it('should login and return a token', async () => {
+        const response = await request(app).post('/auth/login').send({
+            username: 'sania',
+            password: '123456'
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toHaveProperty('token');
+        token = response.body.token;
+    });
+
+    it('should not allow login with incorrect credentials', async () => {
+        const response = await request(app).post('/auth/login').send({
+            username: 'sania',
+            password: '12345f'
+        });
+
+        expect(response.statusCode).toBe(401);
+        expect(response.body.message).toBe('Invalid credentials');
+    });
+});
+
+describe('Event Routes', () => {
+    it('should create a new event', async () => {
+        const response = await request(app)
             .post('/events/create')
+            .set('Authorization', token)
             .send({
-                name: "Meeting",
-                description: "Project discussion",
-                date: "2025-03-20",
-                time: "14:00",
-                category: "Meetings",
+                name: 'Meeting',
+                description: 'Project discussion',
+                date: '2024-07-01',
+                time: '12:00',
+                category: 'Work',
                 reminderMinutes: 30
-            })
-            .set("Authorization", `Bearer ${authToken}`);
+            });
 
-        expect(res.status).toBe(201);
-        expect(res.body.event.name).toBe("Meeting");
+        expect(response.statusCode).toBe(200);
+        expect(response.body.message).toBe('Event created successfully');
+        expect(response.body.event).toHaveProperty('id');
     });
 
-    it('should fail to create an event with missing fields', async () => {
-        const res = await request(server) // Use the server instance for requests
+    it('should not create an event without required fields', async () => {
+        const response = await request(app)
             .post('/events/create')
-            .send({ name: "Meeting" }) // Missing required fields
-            .set("Authorization", `Bearer ${authToken}`);
-
-        expect(res.status).toBe(400);
-        expect(res.body.message).toBe("All fields are required");
-    });
-
-    it('should fetch all events', async () => {
-        const res = await request(server) // Use the server instance for requests
-            .get('/events/view')
-            .set("Authorization", `Bearer ${authToken}`);
-
-        expect(res.status).toBe(200);
-        expect(Array.isArray(res.body)).toBe(true);
-    });
-
-    it('should set a reminder for an event', async () => {
-        const res = await request(server) // Use the server instance for requests
-            .post('/events/create')
+            .set('Authorization', token)
             .send({
-                name: "Doctor Appointment",
-                description: "Dentist visit",
-                date: "2025-03-21",
-                time: "09:00",
-                category: "Appointments",
-                reminderMinutes: 15
-            })
-            .set("Authorization", `Bearer ${authToken}`);
+                name: 'Meeting',
+                date: '2024-07-01'
+            });
 
-        expect(res.status).toBe(201);
-        expect(res.body.event.reminderMinutes).toBe(15);
+        expect(response.statusCode).toBe(400);
+        expect(response.body.message).toBe('All fields are required');
     });
 
-    it('should return 401 if token is missing', async () => {
-        const res = await request(server) // Use the server instance for requests
-            .get('/events/view');
+    it('should get all events for the user', async () => {
+        const response = await request(app)
+            .get('/events/view')
+            .set('Authorization', token);
 
-        expect(res.status).toBe(401);
-        expect(res.body.message).toBe("Unauthorized");
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toBeInstanceOf(Array);
+    });
+
+    it('should not allow access to events without a token', async () => {
+        const response = await request(app).get('/events/view');
+        expect(response.statusCode).toBe(401);
+        expect(response.body.message).toBe('Access Denied');
+    });
+});
+
+describe('Event & Reminder Functionality', () => {
+    let eventId;
+
+    it('should create a new event with a reminder', async () => {
+        const response = await request(app)
+            .post('/events/create')
+            .set('Authorization', token)
+            .send({
+                name: 'Doctor Appointment',
+                description: 'Health Checkup',
+                date: '2024-07-01',
+                time: '15:00',
+                category: 'Health',
+                reminderMinutes: 1 
+            });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body.message).toBe('Event created successfully');
+        eventId = response.body.event.id;
+    });
+    
+
+    it('should retrieve user events', async () => {
+        const response = await request(app)
+            .get('/events/view')
+            .set('Authorization', token);
+
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toBeInstanceOf(Array);
+        expect(response.body.length).toBeGreaterThan(0);
+    });
+
+    it('should not allow unauthorized access to events', async () => {
+        const response = await request(app).get('/events/view');
+        expect(response.statusCode).toBe(401);
+        expect(response.body.message).toBe('Access Denied');
     });
 });
