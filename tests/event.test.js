@@ -1,5 +1,5 @@
 const request = require('supertest');
-const {app,server} = require('../server'); 
+const {app,server, reminderTask} = require('../server'); 
 jest.useFakeTimers(); 
 
 let token; 
@@ -135,4 +135,5 @@ describe('Event & Reminder Functionality', () => {
 
 afterAll(() => {
     server.close(); 
+    reminderTask.stop();
 });

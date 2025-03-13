@@ -14,7 +14,7 @@ app.use('/events', eventRoutes);
 let reminders = [];
 
 const scheduleReminders = () => {
-    cron.schedule('* * * * *', () => { 
+    const task = cron.schedule('* * * * *', () => { 
         const now = new Date();
         reminders.forEach(reminder => {
             if (new Date(reminder.time) <= now) {
@@ -23,11 +23,12 @@ const scheduleReminders = () => {
             }
         });
     });
+    return task;
 };
 
-scheduleReminders();
+const reminderTask = scheduleReminders();
 
 const PORT = process.env.PORT || 5000;
 const server=app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-module.exports = { app, server }; 
+module.exports = { app, server , reminderTask}; 
